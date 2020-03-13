@@ -1,10 +1,12 @@
 #![recursion_limit = "512"]
 
+use afterglow::prelude::*;
 use cfg_if::cfg_if;
-use dodrio_ext::prelude::*;
 
 mod models;
 mod pages;
+mod sw;
+mod views;
 
 cfg_if! {
     if #[cfg(feature = "wee_alloc")] {
@@ -24,5 +26,10 @@ pub fn start() {
         femme::start(log::LevelFilter::Warn).unwrap();
     }
 
-    pages::main::init_page();
+    Entry::init_app::<pages::main::App, pages::main::AppView>("app");
+}
+
+#[wasm_bindgen]
+pub fn from_sw() {
+    log::info!("from within service worker");
 }

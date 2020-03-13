@@ -1,5 +1,5 @@
 [tasks.live-build]
-watch = { ignore_pattern = "docs/*"}
+watch = { watch = ["./src", "./static"] }
 command = "wasm-pack"
 args = ["build", "--debug", "-t", "web", "-d", "docs", "--no-typescript"]
 dependencies = ["check", "migrate-index"]
@@ -18,7 +18,7 @@ args = ["-rf", "docs"]
 
 [tasks.migrate-index]
 command = "cp"
-args = ["-f", "static/index.html", "docs/"]
+args = ["-arf", "static/.", "docs/"]
 
 [tasks.make-release]
 dependencies = ["cleanbuild", "build-release", "cleanup", "migrate-index", "gzip"]

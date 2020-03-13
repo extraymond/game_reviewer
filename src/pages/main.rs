@@ -1,135 +1,56 @@
-use strum_macros::*;
+use crate::{models, views};
+use afterglow::prelude::*;
 
-use dodrio_ext::prelude::*;
+pub struct App {
+    player: Container<models::video::Model>,
+    playlist: Container<models::playlist::Playlist>,
+}
+
+impl LifeCycle for App {
+    fn new(render_tx: Sender<()>) -> Self {
+        let bus = BusService::<models::event_bus::EventsMsg>::new();
+        let mut player_data = models::video::Model::new(render_tx.clone());
+        player_data.bus.replace(bus.clone());
+        let player = Container::new(player_data, Box::new(views::video::View), render_tx.clone());
+        let mut playlist_data = models::playlist::Playlist::new(render_tx.clone());
+        playlist_data.bus.replace(bus.clone());
+
+        let playlist = Container::new(
+            playlist_data,
+            Box::new(views::playlist::View),
+            render_tx.clone(),
+        );
+        App { player, playlist }
+    }
+}
 
 #[derive(Default)]
-pub struct Page {
-    file: Option<String>,
-    plays: Vec<Play>,
-    selected: Option<usize>,
-}
-
-pub struct Play {
-    genre: Genre,
-    time: f32,
-}
-
-#[derive(Display)]
-pub enum Genre {
-    Offesne,
-    Defense,
-}
-
-impl LifeCycle for Page {
-    fn new(render_tx: Sender<()>) -> Self {
-        Page::default()
-    }
-}
-
-pub enum VideoEvents {
-    NewFile(String),
-}
-
-impl Messenger for VideoEvents {
-    type Target = Page;
-
-    fn update(
-        &self,
-        target: &mut Self::Target,
-        sender: Sender<Box<dyn Messenger<Target = Self::Target>>>,
-    ) -> bool {
-        match self {
-            VideoEvents::NewFile(url) => {
-                target.file.replace(url.clone());
-                true
-            }
-        }
-    }
-}
-
-pub enum PlaylistEvents {
-    Clicked(usize),
-}
-
-impl Messenger for PlaylistEvents {
-    type Target = Page;
-
-    fn update(
-        &self,
-        target: &mut Self::Target,
-        sender: Sender<Box<dyn Messenger<Target = Self::Target>>>,
-    ) -> bool {
-        match self {
-            PlaylistEvents::Clicked(idx) => {
-                target.selected.replace(*idx);
-                true
-            }
-        }
-    }
-}
-
-pub struct PageView;
-impl Renderer for PageView {
-    type Target = Page;
-    type Data = Page;
-
+pub struct AppView;
+impl Renderer for AppView {
+    type Target = App;
+    type Data = App;
     fn view<'a>(
         &self,
         target: &Self::Target,
         ctx: &mut RenderContext<'a>,
-        sender: Sender<Box<dyn Messenger<Target = Self::Data>>>,
+        sender: MessageSender<Self::Data>,
     ) -> Node<'a> {
         let bump = ctx.bump;
-        let rows = (0..10).map(|idx| {
-            let is_selected = target.selected.map(|old| old == idx).unwrap_or_default();
-            RowView.view(&(idx, is_selected), ctx, sender.clone())
-        });
         dodrio!(bump,
-                <div class="box">
-                    { rows }
-                </div>
-        )
-    }
-}
-
-pub struct RowView;
-
-impl Renderer for RowView {
-    type Target = (usize, bool);
-    type Data = Page;
-
-    fn view<'a>(
-        &self,
-        target: &Self::Target,
-        ctx: &mut RenderContext<'a>,
-        sender: Sender<Box<dyn Messenger<Target = Self::Data>>>,
-    ) -> Node<'a> {
-        let bump = ctx.bump;
-        let idx = target.0.clone();
-        dodrio!(bump,
-                <div class="box" onclick={ consume(move |e|{ PlaylistEvents::Clicked(idx)}, &sender)}>
-                    <div class={
-                        if target.1 {
-                            "tag is-black"
-                        } else {
-                            "tag"
-                        }
-                    }>
-                    { text(bf!(in bump, "{}", target.0).into_bump_str()) }
+            <div class="hero is-fullheight is-light is-unselectable">
+                <div class="hero-body">
+                    <div class="container" style="position: sticky; top: 0px">
+                        <div class="columns" style="height: 100%">
+                            <div class="column is-8">
+                            { target.player.render(ctx)}
+                            </div>
+                            <div class="column is-4">
+                            { target.playlist.render(ctx)}
+                            </div>
+                        </div>
                     </div>
                 </div>
+            </div>
         )
     }
-}
-
-pub fn init_page() {
-    let block = web_sys::window()
-        .map(|win| win.document())
-        .flatten()
-        .map(|doc| doc.get_element_by_id("app"))
-        .flatten()
-        .unwrap();
-    let mut entry = Entry::new();
-    let app = Page::new(entry.render_tx.clone());
-    entry.mount_vdom(app, &block.unchecked_into(), Box::new(PageView));
 }
