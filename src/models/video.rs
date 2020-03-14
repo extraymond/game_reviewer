@@ -194,6 +194,9 @@ impl Messenger for BusNotification {
             BusNotification::EventFocused(time) => {
                 target.vid.as_ref().map(|vid| {
                     vid.set_current_time(*time);
+                    if vid.paused() {
+                        vid.play().expect("unable to play");
+                    }
                 });
             }
         }

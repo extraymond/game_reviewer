@@ -30,13 +30,19 @@ impl<'x> Renderer for View<'x> {
                     "display: None"
                 } else {
                     if target.2 {
-                        "margin-left: 0.25rem; border-left: 0.5rem solid purple;"
-                    } else {""}
+                        "margin-left: 0.25rem; border-left: 0.5rem solid black; margin-bottom: 0.5rem"
+                    } else {"margin-bottom: 0.5rem"}
                 }
 
             }>
-                <p>{ text(bf!(in bump, "time: {:.1}", target.0.time).into_bump_str())}</p>
-                <p>{ text(bf!(in bump, "genre: {}", target.0.genre).into_bump_str())}</p>
+                <div class="level">
+                    <div class="level-left">
+                        <p>{ text(bf!(in bump, "time: {:.1}", target.0.time).into_bump_str())}</p>
+                    </div>
+                    <div class="level-right">
+                        <div class={target.0.genre.color_tag(bump)}>{ text(bf!(in bump, "{}", target.0.genre).into_bump_str()) }</div>
+                    </div>
+                </div>
             </div>
         )
     }

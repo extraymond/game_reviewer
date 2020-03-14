@@ -27,13 +27,15 @@ impl Renderer for View {
             };
             playview::View::default().view(&(play, idx, selected, filtered), ctx, sender.clone())
         });
+        let plays = dodrio!(bump, <div class="plays">{ plays }</div>);
         dodrio!(bump,
-            <div class="box" style="max-height: 80vh; min-height: 100%; overflow-x: scroll">
+            <div class="playlist-grid box">
+                <div class="top-panel">
                 <p class="heading">"list of plays"</p>
-                <br/>
                 { filter_panel }
-                <br/>
+                </div>
                 { plays }
+                { Tableview.view(target, ctx, sender) }
             </div>
         )
     }
@@ -68,22 +70,8 @@ impl Renderer for FilterBox {
                 </div>
             )
         });
-        let option_group = dodrio!(bump, <div class="field is-grouped">{ options }</div>);
-        // let panel = dodrio!(bump,
-        //     <div class="control">
-        //         <div class="select is-multiple" style={
-        //             if !target.active {
-        //                 "display: None"
-        //             } else {
-        //                 ""
-        //             }
-        //         }>
-        //             <select multiple=true>
-        //                 { options }
-        //             </select>
-        //         </div>
-        //     </div>
-        // );
+        let option_group =
+            dodrio!(bump, <div class="field is-grouped is-grouped-multiline">{ options }</div>);
 
         let title_icon = if target.active {
             dodrio!(bump,
@@ -109,17 +97,57 @@ impl Renderer for FilterBox {
                         { title_icon }
                     </a>
                 </div>
-                <div class="card-content" style={ if target.active {""} else {"display: None"}}>{ option_group }</div>
+                <div class="card-content" style={ if target.active {""} else {"display: None"}}>
+                { option_group }
+                </div>
             </div>
-            // <div class="field">
-            //     <div class="label">"toggle filter"</div>
-            //     <div class="control">
-            //         <div
-            //         onclick={ consume(|e| { playlist::FilterEvent::Toggle }, &sender) }
-            //         class="button"></div>
-            //     </div>
-            //     { panel }
-            // </div>
+        )
+    }
+}
+
+pub struct Tableview;
+impl Renderer for Tableview {
+    type Target = playlist::Playlist;
+    type Data = playlist::Playlist;
+
+    fn view<'a>(
+        &self,
+        target: &Self::Target,
+        ctx: &mut RenderContext<'a>,
+        sender: MessageSender<Self::Data>,
+    ) -> Node<'a> {
+        let bump = ctx.bump;
+
+        let mut rows = play::Genre::iter().collect::<Vec<play::Genre>>();
+        rows.sort_by(|a, b| format!("{}", a).cmp(&format!("{}", b)));
+        let rows = rows
+            .iter()
+            .map(|n| {
+                let genre = bf!(in bump, "{}", n).into_bump_str();
+
+                let counts = target.plays.iter().filter(|play| play.genre == *n).count();
+                let counts = bf!(in bump, "{}", counts).into_bump_str();
+
+                let genre = dodrio!(bump, <td>{ text(genre)}</td>);
+                let counts = dodrio!(bump, <td class="has-text-right">{ text(counts)}</td>);
+                vec![genre, counts]
+            })
+            .map(|a| dodrio!(bump, <tr>{ a }</tr>));
+
+        dodrio!(bump,
+            <div class="info box">
+                <table class="table is-fullwidth">
+                    <thead>
+                        <tr>
+                            <th>"genre"</th>
+                            <th class="has-text-right">"counts"</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    { rows }
+                    </tbody>
+                </table>
+            </div>
         )
     }
 }

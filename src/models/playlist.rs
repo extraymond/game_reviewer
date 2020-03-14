@@ -16,7 +16,9 @@ pub struct Playlist {
 pub struct Filter {
     pub active: bool,
     pub genre: HashSet<play::Genre>,
-    pub range: [Option<f64>; 2],
+    pub range: [f64; 2],
+    pub length: [f64; 2],
+    pub slider_focused: Option<usize>,
 }
 
 pub enum FilterEvent {
@@ -52,7 +54,14 @@ impl Messenger for FilterEvent {
 
 impl LifeCycle for Playlist {
     fn new(render_tx: Sender<()>) -> Self {
-        Playlist::default()
+        Playlist {
+            filter: Filter {
+                range: [0_f64; 2],
+                length: [50_f64; 2],
+                ..Filter::default()
+            },
+            ..Playlist::default()
+        }
     }
 
     fn mounted(

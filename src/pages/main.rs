@@ -37,19 +37,9 @@ impl Renderer for AppView {
     ) -> Node<'a> {
         let bump = ctx.bump;
         dodrio!(bump,
-            <div class="hero is-fullheight is-light is-unselectable">
-                <div class="hero-body">
-                    <div class="container" style="position: sticky; top: 0px">
-                        <div class="columns" style="height: 100%">
-                            <div class="column is-8">
-                            { target.player.render(ctx)}
-                            </div>
-                            <div class="column is-4">
-                            { target.playlist.render(ctx)}
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <div class="is-unselectable grid">
+                { target.player.render(ctx)}
+                { target.playlist.render(ctx)}
             </div>
         )
     }

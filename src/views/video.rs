@@ -19,11 +19,12 @@ impl Renderer for View {
         });
 
         dodrio!(bump,
-            <div class="box" style="height: 100%">
-                <p class="heading">"video player"</p>
+            <div class="box player">
+                <div class="fill-left"></div>
+                <div class="head"><p class="heading">"video player"</p></div>
                 { vid_view }
-                <hr/>
                 { Panel.view(target, ctx, sender)}
+                <div class="fill-right"></div>
             </div>
         )
     }
@@ -36,16 +37,18 @@ impl Renderer for Video {
     fn view<'a>(&self, target: &Self::Target, ctx: &mut RenderContext<'a>, sender: MessageSender<Self::Data>) -> Node<'a> {
         let bump = ctx.bump;
         dodrio!(bump, 
-            <video
-            onloadeddata={ consume(|e| {
-                let vid: web_sys::HtmlMediaElement = e.target().map(|t| t.unchecked_into()).unwrap();
-                video::FileEvent::VidLoaded(vid)
-            }, &sender)}
-            src={
-                target.url.as_ref().map(|url| url.to_string()).unwrap_or_default()
-            } controls={
-                target.url.is_some()
-            }></video>
+            <div class="vid">
+                <video
+                onloadeddata={ consume(|e| {
+                    let vid: web_sys::HtmlMediaElement = e.target().map(|t| t.unchecked_into()).unwrap();
+                    video::FileEvent::VidLoaded(vid)
+                }, &sender)}
+                src={
+                    target.url.as_ref().map(|url| url.to_string()).unwrap_or_default()
+                } controls={
+                    target.url.is_some()
+                }></video>
+            </div>
         )
     }
 }
@@ -75,7 +78,7 @@ impl Renderer for Panel {
         });
 
         dodrio!(bump,
-            <div class="level box">
+            <div class="level box panel">
                 <div class="level-left">
                     <div class="level-item">
                         <div class="file has-name">
