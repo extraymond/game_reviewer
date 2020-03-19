@@ -26,7 +26,7 @@ pub fn start() {
         femme::start(log::LevelFilter::Warn).unwrap();
     }
 
-    Entry::init_app::<pages::main::App, pages::main::AppView>("app");
+    Entry::init_app::<pages::main::App, pages::main::AppView>(Some("app"));
 }
 
 #[wasm_bindgen]

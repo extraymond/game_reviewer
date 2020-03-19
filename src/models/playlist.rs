@@ -2,6 +2,7 @@ use super::play;
 use crate::models::event_bus;
 use afterglow::prelude::*;
 use gloo::events::EventListener;
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 #[derive(Default)]
@@ -10,6 +11,19 @@ pub struct Playlist {
     pub selected: Option<usize>,
     pub bus: Option<BusService<event_bus::EventsMsg>>,
     pub filter: Filter,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CachePlays {
+    pub plays: Vec<play::Play>,
+}
+
+impl Playlist {
+    fn make_backup(&self) -> CachePlays {
+        log::info!("current plays: {}", self.plays.len());
+        let plays = self.plays.clone();
+        CachePlays { plays }
+    }
 }
 
 #[derive(Default)]
@@ -71,11 +85,79 @@ impl LifeCycle for Playlist {
     ) {
         let win = web_sys::window().unwrap();
         BusInit.dispatch(&sender);
+        let sender_handle = sender.clone();
         let keypress = EventListener::new(&win, "keydown", move |e| {
             let e = e.unchecked_ref::<web_sys::Event>();
-            PlaylistMsg::KeyPressed(e.clone()).dispatch(&sender);
+            PlaylistMsg::KeyPressed(e.clone()).dispatch(&sender_handle);
         });
         handlers.push(keypress);
+
+        let db = win.indexed_db().unwrap().unwrap();
+        let req = db.open("cache").unwrap();
+        let req_handle = req.clone();
+        let onopen = EventListener::new(req.clone().unchecked_ref(), "success", move |e| {
+            log::info!("request opend");
+
+            let db: web_sys::IdbDatabase = req_handle.result().unwrap().unchecked_into();
+            let transaction = db
+                .transaction_with_str_and_mode("plays", web_sys::IdbTransactionMode::Readwrite)
+                .unwrap();
+            let store = transaction.object_store("plays").unwrap();
+            let count_req = store.get_all_keys().unwrap();
+            let sender = sender.clone();
+
+            let onopen =
+                EventListener::new(count_req.clone().unchecked_ref(), "success", move |e| {
+                    let sender = sender.clone();
+                    let keys = count_req
+                        .result()
+                        .unwrap()
+                        .unchecked_into::<js_sys::Array>();
+
+                    let key = keys.get(keys.length() - 1);
+                    let get_req = store.get(&key).unwrap();
+                    let onopen =
+                        EventListener::new(get_req.clone().unchecked_ref(), "success", move |e| {
+                            let item = get_req.result().unwrap();
+                            let buffer_js: js_sys::Uint8Array = item.into();
+                            log::info!("js buffer: {:?}", buffer_js);
+                            let mut buffer = vec![0_u8; buffer_js.length() as usize];
+                            buffer_js.copy_to(&mut buffer[..]);
+                            let plays: CachePlays = bincode::deserialize(&buffer[..]).unwrap();
+                            PlaylistMsg::LoadBackup(plays).dispatch(&sender);
+                            // log::info!("retried plays!!!");
+                        });
+                    onopen.forget();
+                });
+            onopen.forget();
+        });
+
+        onopen.forget();
+        let req_handle = req.clone();
+
+        let ondbupgrade =
+            EventListener::new(&req.clone().unchecked_ref(), "upgradeneeded", move |_| {
+                let db: web_sys::IdbDatabase = req_handle.result().unwrap().unchecked_into();
+
+                let names = db.object_store_names();
+
+                let mut has_plays = false;
+                for idx in 0..names.length() as usize {
+                    let name = names.get(idx as u32).unwrap();
+                    if name == "plays" {
+                        has_plays = true;
+                    }
+                }
+
+                if !has_plays {
+                    let mut option = web_sys::IdbObjectStoreParameters::new();
+                    option.auto_increment(true);
+                    db.create_object_store_with_optional_parameters("plays", &option)
+                        .unwrap();
+                }
+            });
+
+        ondbupgrade.forget();
     }
 }
 
@@ -98,6 +180,8 @@ pub enum PlaylistMsg {
     PlayClicked(usize),
     PlayDBClicked(usize),
     KeyPressed(web_sys::Event),
+    MakeBackup,
+    LoadBackup(CachePlays),
 }
 
 impl Messenger for PlaylistMsg {
@@ -132,6 +216,37 @@ impl Messenger for PlaylistMsg {
                 let e = e.unchecked_ref::<web_sys::KeyboardEvent>();
                 let key = e.key();
                 KeyEvents::Key(key).dispatch(&sender);
+            }
+            PlaylistMsg::MakeBackup => {
+                let plays = target.make_backup();
+                let buffer = bincode::serialize(&plays).unwrap();
+                let js_buffer = js_sys::Uint8Array::from(&buffer[..]);
+
+                let win = web_sys::window().unwrap();
+                let db = win.indexed_db().unwrap().unwrap();
+                let req = db.open("cache").unwrap();
+                let req_handle = req.clone();
+                let onsuccess =
+                    EventListener::new(req.clone().unchecked_ref(), "success", move |e| {
+                        log::info!("request opend");
+
+                        let db: web_sys::IdbDatabase =
+                            req_handle.result().unwrap().unchecked_into();
+                        let transaction = db
+                            .transaction_with_str_and_mode(
+                                "plays",
+                                web_sys::IdbTransactionMode::Readwrite,
+                            )
+                            .unwrap();
+                        let store = transaction.object_store("plays").unwrap();
+                        store.add(&js_buffer).unwrap();
+                    });
+                onsuccess.forget();
+            }
+            PlaylistMsg::LoadBackup(plays) => {
+                let CachePlays { plays } = plays;
+                target.plays = plays.to_vec();
+                return true;
             }
         }
         false
@@ -231,9 +346,8 @@ impl Messenger for BusNotification {
                 return true;
             }
             BusNotification::FileRemoved => {
-                target.selected = None;
-                target.plays = vec![];
-                return true;
+                let pre_task = PlaylistMsg::MakeBackup.dispatch_async(&sender, None);
+                let _ = BusNotification::NewFile("".into()).dispatch_async(&sender, Some(pre_task));
             }
         }
         false

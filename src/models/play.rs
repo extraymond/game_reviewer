@@ -1,14 +1,15 @@
 use afterglow::prelude::*;
 use dodrio::bumpalo::Bump;
+use serde::{Deserialize, Serialize};
 use strum_macros::*;
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize, Clone, Debug)]
 pub struct Play {
     pub time: f64,
     pub genre: Genre,
 }
 
-#[derive(Display, Clone, Eq, Hash, PartialEq, EnumIter, Copy)]
+#[derive(Display, Clone, Eq, Hash, PartialEq, EnumIter, Copy, Serialize, Deserialize, Debug)]
 pub enum Genre {
     Other,
     Offense,

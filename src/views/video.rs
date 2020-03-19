@@ -47,11 +47,13 @@ impl Renderer for Video {
                     target.url.as_ref().map(|url| url.to_string()).unwrap_or_default()
                 } controls={
                     target.url.is_some()
-                }></video>
+                }>
+                </video>
             </div>
         )
     }
 }
+
 
 pub struct Panel;
 impl Renderer for Panel {
@@ -77,6 +79,9 @@ impl Renderer for Panel {
                 class="button">"unset file"</div>)
         });
 
+
+
+
         dodrio!(bump,
             <div class="level box panel">
                 <div class="level-left">
@@ -96,13 +101,27 @@ impl Renderer for Panel {
                                 </span>
                             <span class="file-name">{ text(bf!(in bump, "{}", file_name).into_bump_str())}</span>
                             </label>
-                            </div>
                         </div>
-                </div>
-                    <div class="level-right">
-                        { close_button }
                     </div>
                 </div>
+                <div class="level-right">
+                { close_button }
+                </div>
+            </div>
         )
+    }
+}
+
+
+
+pub struct Overlay;
+impl Renderer for Overlay {
+    type Target = video::Model;
+    type Data = video::Model;
+
+    fn view<'a>(&self, target: &Self::Target, ctx: &mut RenderContext<'a>, sender: MessageSender<Self::Data>) -> Node<'a> {
+        let bump = ctx.bump;
+        dodrio!(bump, <div class="tag is-overlay" style="border: solid">"I'm overlay"</div>)
+
     }
 }
