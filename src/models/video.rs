@@ -24,13 +24,15 @@ impl LifeCycle for Model {
         render_tx: Sender<()>,
         handlers: &mut Vec<EventListener>,
     ) {
-        BusInit::Init.dispatch(&sender);
+        spawn_local(BusInit::Init.dispatch(&sender));
         let window: web_sys::EventTarget = web_sys::window().unwrap().unchecked_into();
         let onkeypress = EventListener::new(&window, "keypress", move |e| {
-            KeyEvent {
-                event: e.clone().unchecked_into(),
-            }
-            .dispatch(&sender);
+            spawn_local(
+                KeyEvent {
+                    event: e.clone().unchecked_into(),
+                }
+                .dispatch(&sender),
+            );
         });
         handlers.push(onkeypress);
     }

@@ -3,9 +3,10 @@
 [[package]]
 name = "afterglow"
 version = "0.1.0"
-source = "git+https://github.com/extraymond/afterglow#ae0815b3f784a5544037dd0cf20a9361412a7b10"
+source = "git+https://github.com/extraymond/afterglow#05d4c279c75d48fff05d29f4c0e19c569331bb1b"
 dependencies = [
  "async-trait",
+ "async_executors",
  "cfg-if",
  "console_error_panic_hook",
  "dodrio 0.1.0 (git+https://github.com/fitzgen/dodrio)",
@@ -95,6 +96,20 @@ dependencies = [
  "proc-macro2 1.0.9",
  "quote 1.0.3",
  "syn 1.0.16",
+]
+
+[[package]]
+name = "async_executors"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "458c6428636c2e66af249414650b4017dd7f6b78b40a9721fe5ad45712d854fd"
+dependencies = [
+ "futures-channel",
+ "futures-core",
+ "futures-task",
+ "futures-util",
+ "pin-utils",
+ "wasm-bindgen-futures 0.4.9",
 ]
 
 [[package]]
@@ -524,6 +539,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b0a34e53cf6cdcd0178aa573aed466b646eb3db769570841fda0c7ede375a27"
 
 [[package]]
+name = "futures-timer"
+version = "3.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e64b03909df88034c26dc1547e8970b91f98bdb65165d6a4e9110d94263dbb2c"
+dependencies = [
+ "gloo-timers",
+ "send_wrapper",
+]
+
+[[package]]
 name = "futures-util"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -558,11 +583,13 @@ dependencies = [
  "afterglow",
  "anyhow",
  "async-trait",
+ "async_executors",
  "bincode",
  "cfg-if",
  "console_error_panic_hook",
  "femme",
  "futures 0.3.4",
+ "futures-timer",
  "gloo",
  "js-sys",
  "log",
@@ -645,6 +672,8 @@ version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47204a46aaff920a1ea58b11d03dec6f704287d27561724a4631e450654a891f"
 dependencies = [
+ "futures-channel",
+ "futures-core",
  "js-sys",
  "wasm-bindgen",
  "web-sys",
@@ -1104,6 +1133,12 @@ name = "scopeguard"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
+
+[[package]]
+name = "send_wrapper"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f638d531eccd6e23b980caf34876660d38e265409d8e99b397ab71eb3612fad0"
 
 [[package]]
 name = "serde"

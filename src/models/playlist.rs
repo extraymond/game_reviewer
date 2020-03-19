@@ -84,11 +84,11 @@ impl LifeCycle for Playlist {
         handlers: &mut Vec<EventListener>,
     ) {
         let win = web_sys::window().unwrap();
-        BusInit.dispatch(&sender);
+        spawn_local(BusInit.dispatch(&sender));
         let sender_handle = sender.clone();
         let keypress = EventListener::new(&win, "keydown", move |e| {
             let e = e.unchecked_ref::<web_sys::Event>();
-            PlaylistMsg::KeyPressed(e.clone()).dispatch(&sender_handle);
+            spawn_local(PlaylistMsg::KeyPressed(e.clone()).dispatch(&sender_handle));
         });
         handlers.push(keypress);
 
@@ -120,11 +120,12 @@ impl LifeCycle for Playlist {
                         EventListener::new(get_req.clone().unchecked_ref(), "success", move |e| {
                             let item = get_req.result().unwrap();
                             let buffer_js: js_sys::Uint8Array = item.into();
+                            log::info!("buffer size: {}", buffer_js.length());
                             log::info!("js buffer: {:?}", buffer_js);
                             let mut buffer = vec![0_u8; buffer_js.length() as usize];
                             buffer_js.copy_to(&mut buffer[..]);
                             let plays: CachePlays = bincode::deserialize(&buffer[..]).unwrap();
-                            PlaylistMsg::LoadBackup(plays).dispatch(&sender);
+                            spawn_local(PlaylistMsg::LoadBackup(plays).dispatch(&sender));
                             // log::info!("retried plays!!!");
                         });
                     onopen.forget();
@@ -215,7 +216,7 @@ impl Messenger for PlaylistMsg {
             PlaylistMsg::KeyPressed(e) => {
                 let e = e.unchecked_ref::<web_sys::KeyboardEvent>();
                 let key = e.key();
-                KeyEvents::Key(key).dispatch(&sender);
+                spawn_local(KeyEvents::Key(key).dispatch(&sender));
             }
             PlaylistMsg::MakeBackup => {
                 let plays = target.make_backup();
@@ -346,8 +347,12 @@ impl Messenger for BusNotification {
                 return true;
             }
             BusNotification::FileRemoved => {
-                let pre_task = PlaylistMsg::MakeBackup.dispatch_async(&sender, None);
-                let _ = BusNotification::NewFile("".into()).dispatch_async(&sender, Some(pre_task));
+                let pre_task = PlaylistMsg::MakeBackup.dispatch(&sender);
+                let after = BusNotification::NewFile("".into()).dispatch(&sender);
+                spawn_local(async move {
+                    pre_task.await;
+                    after.await;
+                })
             }
         }
         false
