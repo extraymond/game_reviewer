@@ -11,7 +11,7 @@ pub struct Model {
 }
 
 impl LifeCycle for Model {
-    fn new(render_tx: Sender<()>) -> Self {
+    fn new(render_tx: Sender<((), oneshot::Sender<()>)>) -> Self {
         let bus = BusService::new();
         Model {
             bus: Some(bus),
@@ -20,12 +20,14 @@ impl LifeCycle for Model {
     }
 
     fn mounted(
-        sender: MessageSender<Self>,
-        render_tx: Sender<()>,
+        sender: &MessageSender<Self>,
+        render_tx: &Sender<((), oneshot::Sender<()>)>,
         handlers: &mut Vec<EventListener>,
     ) {
-        spawn_local(BusInit::Init.dispatch(&sender));
+        spawn_local(BusInit::Init.dispatch(&sender.clone()));
+
         let window: web_sys::EventTarget = web_sys::window().unwrap().unchecked_into();
+        let sender = sender.clone();
         let onkeypress = EventListener::new(&window, "keypress", move |e| {
             spawn_local(
                 KeyEvent {
@@ -34,6 +36,7 @@ impl LifeCycle for Model {
                 .dispatch(&sender),
             );
         });
+
         handlers.push(onkeypress);
     }
 }
@@ -46,16 +49,42 @@ impl Messenger for BusInit {
     type Target = Model;
 
     fn update(
-        &self,
+        self: Box<Self>,
         target: &mut Self::Target,
-        sender: MessageSender<Self::Target>,
-        render_tx: Sender<()>,
+        sender: &MessageSender<Self::Target>,
+        render_tx: &Sender<((), oneshot::Sender<()>)>,
     ) -> bool {
-        match self {
+        match *self {
             BusInit::Init => {
                 target.bus.as_mut().map(|bus| {
                     bus.register(sender.clone());
                 });
+            }
+        }
+        false
+    }
+}
+
+pub enum Background {
+    CaseA,
+    CaseB,
+}
+
+impl Messenger for Background {
+    type Target = Model;
+
+    fn update(
+        self: Box<Self>,
+        target: &mut Self::Target,
+        sender: &MessageSender<Self::Target>,
+        render_tx: &Sender<((), oneshot::Sender<()>)>,
+    ) -> bool {
+        match *self {
+            Background::CaseA => {
+                log::info!("case A working");
+            }
+            Background::CaseB => {
+                log::info!("case B working");
             }
         }
         false
@@ -73,12 +102,12 @@ impl Messenger for FileEvent {
     type Target = Model;
 
     fn update(
-        &self,
+        self: Box<Self>,
         target: &mut Self::Target,
-        sender: MessageSender<Self::Target>,
-        render_tx: Sender<()>,
+        sender: &MessageSender<Self::Target>,
+        render_tx: &Sender<((), oneshot::Sender<()>)>,
     ) -> bool {
-        match self {
+        match *self {
             FileEvent::Added(e) => {
                 let input = e
                     .target()
@@ -133,12 +162,12 @@ impl Messenger for KeyEvent {
     type Target = Model;
 
     fn update(
-        &self,
+        self: Box<Self>,
         target: &mut Self::Target,
-        sender: MessageSender<Self::Target>,
-        render_tx: Sender<()>,
+        sender: &MessageSender<Self::Target>,
+        render_tx: &Sender<((), oneshot::Sender<()>)>,
     ) -> bool {
-        let KeyEvent { event } = self;
+        let KeyEvent { event } = *self;
         match &*event.key() {
             "o" => {
                 if let Some(vid) = target.vid.as_ref() {
@@ -187,15 +216,15 @@ pub enum BusNotification {
 impl Messenger for BusNotification {
     type Target = Model;
     fn update(
-        &self,
+        self: Box<Self>,
         target: &mut Self::Target,
-        sender: MessageSender<Self::Target>,
-        render_tx: Sender<()>,
+        sender: &MessageSender<Self::Target>,
+        render_tx: &Sender<((), oneshot::Sender<()>)>,
     ) -> bool {
-        match self {
+        match *self {
             BusNotification::EventFocused(time) => {
                 target.vid.as_ref().map(|vid| {
-                    vid.set_current_time(*time);
+                    vid.set_current_time(time);
                     if vid.paused() {
                         vid.play().expect("unable to play");
                     }

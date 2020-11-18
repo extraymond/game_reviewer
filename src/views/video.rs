@@ -1,5 +1,6 @@
 use crate::models::video;
 use afterglow::prelude::*;
+use typed_html::dodrio;
 
 #[derive(Default)]
 pub struct View;
@@ -11,11 +12,11 @@ impl Renderer for View {
         &self,
         target: &Self::Target,
         ctx: &mut RenderContext<'a>,
-        sender: MessageSender<Self::Data>,
+        sender: &MessageSender<Self::Data>,
     ) -> Node<'a> {
         let bump = ctx.bump;
         let vid_view = target.file.as_ref().map(|_| {
-             Video.view(target, ctx, sender.clone())
+             Video.view(target, ctx, &sender)
         });
 
         dodrio!(bump,
@@ -34,7 +35,7 @@ pub struct Video;
 impl Renderer for Video {
     type Target = video::Model;
     type Data = video::Model;
-    fn view<'a>(&self, target: &Self::Target, ctx: &mut RenderContext<'a>, sender: MessageSender<Self::Data>) -> Node<'a> {
+    fn view<'a>(&self, target: &Self::Target, ctx: &mut RenderContext<'a>, sender: &MessageSender<Self::Data>) -> Node<'a> {
         let bump = ctx.bump;
         dodrio!(bump, 
             <div class="vid">
@@ -64,14 +65,14 @@ impl Renderer for Panel {
         &self,
         target: &Self::Target,
         ctx: &mut RenderContext<'a>,
-        sender: MessageSender<Self::Data>,
+        sender: &MessageSender<Self::Data>,
     ) -> Node<'a> {
         let bump = ctx.bump;
         let file_name = target
             .file
             .as_ref()
             .map(|file| file.name())
-            .unwrap_or("no file selected".to_string());
+            .unwrap_or_else(|| "no file selected".to_string());
 
         let close_button = target.file.as_ref().map(|_| {
             dodrio!(bump, <div 
@@ -119,7 +120,7 @@ impl Renderer for Overlay {
     type Target = video::Model;
     type Data = video::Model;
 
-    fn view<'a>(&self, target: &Self::Target, ctx: &mut RenderContext<'a>, sender: MessageSender<Self::Data>) -> Node<'a> {
+    fn view<'a>(&self, target: &Self::Target, ctx: &mut RenderContext<'a>, sender: &MessageSender<Self::Data>) -> Node<'a> {
         let bump = ctx.bump;
         dodrio!(bump, <div class="tag is-overlay" style="border: solid">"I'm overlay"</div>)
 

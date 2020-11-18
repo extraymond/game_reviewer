@@ -42,13 +42,14 @@ pub enum FilterEvent {
 
 impl Messenger for FilterEvent {
     type Target = Playlist;
+
     fn update(
-        &self,
+        self: Box<Self>,
         target: &mut Self::Target,
-        sender: MessageSender<Self::Target>,
-        render_tx: Sender<()>,
+        sender: &MessageSender<Self::Target>,
+        render_tx: &Sender<((), oneshot::Sender<()>)>,
     ) -> bool {
-        match self {
+        match *self {
             FilterEvent::Toggle => {
                 target.filter.active = !target.filter.active;
                 return true;
@@ -57,7 +58,7 @@ impl Messenger for FilterEvent {
                 if target.filter.genre.get(&genre).is_some() {
                     target.filter.genre.remove(&genre);
                 } else {
-                    target.filter.genre.insert(*genre);
+                    target.filter.genre.insert(genre);
                 }
                 return true;
             }
@@ -67,7 +68,7 @@ impl Messenger for FilterEvent {
 }
 
 impl LifeCycle for Playlist {
-    fn new(render_tx: Sender<()>) -> Self {
+    fn new(render_tx: Sender<((), oneshot::Sender<()>)>) -> Self {
         Playlist {
             filter: Filter {
                 range: [0_f64; 2],
@@ -79,8 +80,8 @@ impl LifeCycle for Playlist {
     }
 
     fn mounted(
-        sender: MessageSender<Self>,
-        render_tx: Sender<()>,
+        sender: &MessageSender<Self>,
+        render_tx: &Sender<((), oneshot::Sender<()>)>,
         handlers: &mut Vec<EventListener>,
     ) {
         let win = web_sys::window().unwrap();
@@ -95,7 +96,8 @@ impl LifeCycle for Playlist {
         let db = win.indexed_db().unwrap().unwrap();
         let req = db.open("cache").unwrap();
         let req_handle = req.clone();
-        let onopen = EventListener::new(req.clone().unchecked_ref(), "success", move |e| {
+        let sender = sender.clone();
+        let onopen = EventListener::new(req.unchecked_ref(), "success", move |e| {
             log::info!("request opend");
 
             let db: web_sys::IdbDatabase = req_handle.result().unwrap().unchecked_into();
@@ -114,19 +116,19 @@ impl LifeCycle for Playlist {
                         .unwrap()
                         .unchecked_into::<js_sys::Array>();
 
+                    log::info!("{:?}", keys);
+
                     let key = keys.get(keys.length() - 1);
                     let get_req = store.get(&key).unwrap();
                     let onopen =
                         EventListener::new(get_req.clone().unchecked_ref(), "success", move |e| {
                             let item = get_req.result().unwrap();
                             let buffer_js: js_sys::Uint8Array = item.into();
-                            log::info!("buffer size: {}", buffer_js.length());
-                            log::info!("js buffer: {:?}", buffer_js);
+
                             let mut buffer = vec![0_u8; buffer_js.length() as usize];
                             buffer_js.copy_to(&mut buffer[..]);
                             let plays: CachePlays = bincode::deserialize(&buffer[..]).unwrap();
                             spawn_local(PlaylistMsg::LoadBackup(plays).dispatch(&sender));
-                            // log::info!("retried plays!!!");
                         });
                     onopen.forget();
                 });
@@ -136,27 +138,26 @@ impl LifeCycle for Playlist {
         onopen.forget();
         let req_handle = req.clone();
 
-        let ondbupgrade =
-            EventListener::new(&req.clone().unchecked_ref(), "upgradeneeded", move |_| {
-                let db: web_sys::IdbDatabase = req_handle.result().unwrap().unchecked_into();
+        let ondbupgrade = EventListener::new(&req.unchecked_ref(), "upgradeneeded", move |_| {
+            let db: web_sys::IdbDatabase = req_handle.result().unwrap().unchecked_into();
 
-                let names = db.object_store_names();
+            let names = db.object_store_names();
 
-                let mut has_plays = false;
-                for idx in 0..names.length() as usize {
-                    let name = names.get(idx as u32).unwrap();
-                    if name == "plays" {
-                        has_plays = true;
-                    }
+            let mut has_plays = false;
+            for idx in 0..names.length() as usize {
+                let name = names.get(idx as u32).unwrap();
+                if name == "plays" {
+                    has_plays = true;
                 }
+            }
 
-                if !has_plays {
-                    let mut option = web_sys::IdbObjectStoreParameters::new();
-                    option.auto_increment(true);
-                    db.create_object_store_with_optional_parameters("plays", &option)
-                        .unwrap();
-                }
-            });
+            if !has_plays {
+                let mut option = web_sys::IdbObjectStoreParameters::new();
+                option.auto_increment(true);
+                db.create_object_store_with_optional_parameters("plays", &option)
+                    .unwrap();
+            }
+        });
 
         ondbupgrade.forget();
     }
@@ -166,10 +167,10 @@ pub struct BusInit;
 impl Messenger for BusInit {
     type Target = Playlist;
     fn update(
-        &self,
+        self: Box<Self>,
         target: &mut Self::Target,
-        sender: MessageSender<Self::Target>,
-        render_tx: Sender<()>,
+        sender: &MessageSender<Self::Target>,
+        render_tx: &Sender<((), oneshot::Sender<()>)>,
     ) -> bool {
         if let Some(bus) = target.bus.as_mut() {
             bus.register(sender.clone());
@@ -189,24 +190,24 @@ impl Messenger for PlaylistMsg {
     type Target = Playlist;
 
     fn update(
-        &self,
+        self: Box<Self>,
         target: &mut Self::Target,
-        sender: MessageSender<Self::Target>,
-        render_tx: Sender<()>,
+        sender: &MessageSender<Self::Target>,
+        render_tx: &Sender<((), oneshot::Sender<()>)>,
     ) -> bool {
-        match self {
+        match *self {
             PlaylistMsg::PlayClicked(idx) => {
                 if let Some(old) = target.selected {
-                    if old == *idx {
+                    if old == idx {
                         target.selected = None;
                         return true;
                     }
                 }
-                target.selected.replace(*idx);
+                target.selected.replace(idx);
                 return true;
             }
             PlaylistMsg::PlayDBClicked(idx) => {
-                if let Some(play) = target.plays.get(*idx) {
+                if let Some(play) = target.plays.get(idx) {
                     let time = play.time;
                     target.bus.as_ref().map(|bus| {
                         bus.publish(event_bus::EventsMsg::EventFocused(time));
@@ -262,14 +263,14 @@ impl Messenger for KeyEvents {
     type Target = Playlist;
 
     fn update(
-        &self,
+        self: Box<Self>,
         target: &mut Self::Target,
-        sender: MessageSender<Self::Target>,
-        render_tx: Sender<()>,
+        sender: &MessageSender<Self::Target>,
+        render_tx: &Sender<((), oneshot::Sender<()>)>,
     ) -> bool {
-        let KeyEvents::Key(key) = self;
+        let KeyEvents::Key(key) = *self;
 
-        match &**key {
+        match &*key {
             "d" | "Delete" => {
                 return target
                     .selected
@@ -328,12 +329,12 @@ impl Messenger for BusNotification {
     type Target = Playlist;
 
     fn update(
-        &self,
+        self: Box<Self>,
         target: &mut Self::Target,
-        sender: MessageSender<Self::Target>,
-        render_tx: Sender<()>,
+        sender: &MessageSender<Self::Target>,
+        render_tx: &Sender<((), oneshot::Sender<()>)>,
     ) -> bool {
-        match self {
+        match *self {
             BusNotification::NewFile(url) => {
                 target.selected = None;
                 target.plays = vec![];
@@ -341,8 +342,8 @@ impl Messenger for BusNotification {
             }
             BusNotification::NewEvent(time, genre) => {
                 let mut play = play::Play::default();
-                play.genre = *genre;
-                play.time = *time as f64;
+                play.genre = genre;
+                play.time = time as f64;
                 target.plays.push(play);
                 return true;
             }

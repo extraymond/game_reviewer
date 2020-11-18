@@ -1,5 +1,6 @@
 use crate::{models, views};
 use afterglow::prelude::*;
+use typed_html::dodrio;
 
 pub struct App {
     player: Container<models::video::Model>,
@@ -7,7 +8,7 @@ pub struct App {
 }
 
 impl LifeCycle for App {
-    fn new(render_tx: Sender<()>) -> Self {
+    fn new(render_tx: Sender<((), oneshot::Sender<()>)>) -> Self {
         let bus = BusService::<models::event_bus::EventsMsg>::new();
         let mut player_data = models::video::Model::new(render_tx.clone());
         player_data.bus.replace(bus.clone());
@@ -26,14 +27,16 @@ impl LifeCycle for App {
 
 #[derive(Default)]
 pub struct AppView;
+
 impl Renderer for AppView {
     type Target = App;
     type Data = App;
+
     fn view<'a>(
         &self,
         target: &Self::Target,
         ctx: &mut RenderContext<'a>,
-        sender: MessageSender<Self::Data>,
+        sender: &MessageSender<Self::Data>,
     ) -> Node<'a> {
         let bump = ctx.bump;
         dodrio!(bump,

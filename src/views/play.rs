@@ -1,6 +1,7 @@
 use crate::models::{play, playlist};
 use afterglow::prelude::*;
 use std::marker::PhantomData;
+use typed_html::dodrio;
 
 #[derive(Default)]
 pub struct View<'x>(pub PhantomData<&'x ()>);
@@ -13,7 +14,7 @@ impl<'x> Renderer for View<'x> {
         &self,
         target: &Self::Target,
         ctx: &mut RenderContext<'a>,
-        sender: MessageSender<Self::Data>,
+        sender: &MessageSender<Self::Data>,
     ) -> Node<'a> {
         let bump = ctx.bump;
         dodrio!(bump,

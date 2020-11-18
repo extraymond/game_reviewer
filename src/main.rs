@@ -15,15 +15,14 @@ cfg_if! {
     }
 }
 
-#[wasm_bindgen]
-pub fn start() {
+fn main() {
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
 
     if cfg!(debug_assertions) {
-        femme::start(log::LevelFilter::Debug).unwrap();
+        femme::with_level(log::LevelFilter::Debug);
     } else {
-        femme::start(log::LevelFilter::Warn).unwrap();
+        femme::with_level(log::LevelFilter::Warn);
     }
 
     Entry::init_app::<pages::main::App, pages::main::AppView>(Some("app"));

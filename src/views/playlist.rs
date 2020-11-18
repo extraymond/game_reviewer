@@ -3,6 +3,7 @@ use crate::models::play;
 use crate::models::playlist;
 use afterglow::prelude::*;
 use strum::IntoEnumIterator;
+use typed_html::dodrio;
 
 #[derive(Default)]
 pub struct View;
@@ -14,10 +15,10 @@ impl Renderer for View {
         &self,
         target: &Self::Target,
         ctx: &mut RenderContext<'a>,
-        sender: MessageSender<Self::Data>,
+        sender: &MessageSender<Self::Data>,
     ) -> Node<'a> {
         let bump = ctx.bump;
-        let filter_panel = FilterBox.view(&target.filter, ctx, sender.clone());
+        let filter_panel = FilterBox.view(&target.filter, ctx, &sender);
         let plays = target.plays.iter().enumerate().map(|(idx, play)| {
             let selected = target.selected.map(|v| v == idx).unwrap_or_default();
             let filtered = if target.filter.genre.len() == 0 {
@@ -25,7 +26,7 @@ impl Renderer for View {
             } else {
                 target.filter.genre.contains(&play.genre)
             };
-            playview::View::default().view(&(play, idx, selected, filtered), ctx, sender.clone())
+            playview::View::default().view(&(play, idx, selected, filtered), ctx, &sender)
         });
         let plays = dodrio!(bump, <div class="plays">{ plays }</div>);
         dodrio!(bump,
@@ -51,7 +52,7 @@ impl Renderer for FilterBox {
         &self,
         target: &Self::Target,
         ctx: &mut RenderContext<'a>,
-        sender: MessageSender<Self::Data>,
+        sender: &MessageSender<Self::Data>,
     ) -> Node<'a> {
         let bump = ctx.bump;
         let status = if target.active { "hide" } else { "show" };
@@ -114,7 +115,7 @@ impl Renderer for Tableview {
         &self,
         target: &Self::Target,
         ctx: &mut RenderContext<'a>,
-        sender: MessageSender<Self::Data>,
+        sender: &MessageSender<Self::Data>,
     ) -> Node<'a> {
         let bump = ctx.bump;
 
